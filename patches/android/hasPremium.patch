@@ -1,0 +1,27 @@
+diff --git a/app/src/main/kotlin/com/x8bit/bitwarden/data/auth/repository/util/GetTokenResponseExtensions.kt b/app/src/main/kotlin/com/x8bit/bitwarden/data/auth/repository/util/GetTokenResponseExtensions.kt
+index 90b1ce120..d44642099 100644
+--- a/app/src/main/kotlin/com/x8bit/bitwarden/data/auth/repository/util/GetTokenResponseExtensions.kt
++++ b/app/src/main/kotlin/com/x8bit/bitwarden/data/auth/repository/util/GetTokenResponseExtensions.kt
+@@ -31,7 +31,7 @@ fun GetTokenResponseJson.Success.toUserState(
+             stamp = null,
+             organizationId = null,
+             avatarColorHex = null,
+-            hasPremium = jwtTokenData.hasPremium,
++            hasPremium = true,
+             forcePasswordResetReason = this.toForcePasswordResetReason(),
+             kdfType = this.kdfType,
+             kdfIterations = this.kdfIterations,
+diff --git a/app/src/main/kotlin/com/x8bit/bitwarden/data/auth/repository/util/UserStateJsonExtensions.kt b/app/src/main/kotlin/com/x8bit/bitwarden/data/auth/repository/util/UserStateJsonExtensions.kt
+index f036bcc0a..85000fe17 100644
+--- a/app/src/main/kotlin/com/x8bit/bitwarden/data/auth/repository/util/UserStateJsonExtensions.kt
++++ b/app/src/main/kotlin/com/x8bit/bitwarden/data/auth/repository/util/UserStateJsonExtensions.kt
+@@ -166,7 +166,7 @@ fun UserStateJson.toUserState(
+                         .settings
+                         .environmentUrlData
+                         .toEnvironmentUrlsOrDefault(),
+-                    isPremium = profile.hasPremium == true,
++                    isPremium = true,
+                     isLoggedIn = userAccountTokens
+                         .find { it.userId == userId }
+                         ?.isLoggedIn == true,
+---

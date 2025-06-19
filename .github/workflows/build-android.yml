@@ -1,0 +1,152 @@
+name: Build Android
+
+on:
+    workflow_call:
+        inputs: {}
+    workflow_dispatch:
+        inputs: {}
+    push:
+        branches: [master, main]
+    schedule:
+        # On every Sunday 12:00
+        - cron: "0 12 * * 0"
+
+permissions:
+    contents: write
+
+defaults:
+    run:
+        shell: bash
+
+jobs:
+    setup:
+        name: Setup
+        runs-on: ubuntu-22.04
+        outputs:
+            latest_android_tag: ${{ steps.gen_vars.outputs.latest_android_tag }}
+        steps:
+            - name: Check out repo
+              uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+            - name: Clone real repo
+              run: |
+                  git clone https://github.com/bitwarden/android.git
+
+            - name: Get Latest Andorid Tag
+              id: gen_vars
+              working-directory: android
+              run: |
+                  # Find all tags and sort by time
+                  git fetch --tags
+                  tags=$(git tag --sort=-creatordate)
+                  # Find "android" tag
+                  latest_android_tag=""
+                  for tag in $tags; do
+                      if [[ $tag == *"bwpm"* ]]; then
+                          latest_android_tag=$tag
+                          break
+                      fi
+                  done
+
+                  echo "latest_android_tag=$latest_android_tag" >> $GITHUB_OUTPUT
+                  echo "latest_android_tag=$latest_android_tag"
+
+    build-source:
+        name: Build andorid
+        runs-on: ubuntu-22.04
+        needs:
+            - setup
+        env:
+            _LATEST_ANDROID_TAG: ${{ needs.setup.outputs.latest_android_tag }}
+            JAVA_VERSION: 17
+        steps:
+            - name: Check out repo
+              uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+            - name: Clone real repo
+              run: |
+                  git clone https://github.com/bitwarden/android.git
+
+            # 
+            # - name: Setup repo
+            #   working-directory: android
+            #   run: |
+            #       git fetch --tags
+            #       echo "Checking out ${{ env._LATEST_ANDROID_TAG }}"
+            #       git checkout ${{ env._LATEST_ANDROID_TAG }}
+            
+            - name: Validate Gradle wrapper
+              uses: gradle/actions/wrapper-validation@06832c7b30a0129d7fb559bcc6e43d26f6374244 # v4.3.1
+
+            - name: Cache Gradle files
+              uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+              with:
+                path: |
+                  ~/.gradle/caches
+                  ~/.gradle/wrapper
+                key: ${{ runner.os }}-gradle-v2-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', '**/libs.versions.toml') }}
+                restore-keys: |
+                  ${{ runner.os }}-gradle-v2-
+
+            - name: Cache build output
+              uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+              with:
+                path: |
+                  ${{ github.workspace }}/build-cache
+                key: ${{ runner.os }}-build-cache-${{ github.sha }}
+                restore-keys: |
+                  ${{ runner.os }}-build-
+
+            - name: Configure JDK
+              uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+              with:
+                distribution: "temurin"
+                java-version: ${{ env.JAVA_VERSION }}
+
+            - name: Configure Ruby
+              uses: ruby/setup-ruby@ca041f971d66735f3e5ff1e21cc13e2d51e7e535 # v1.233.0
+              with:
+                bundler-cache: true
+                ruby-version: '3.3.1'
+
+            - name: Install Fastlane
+              working-directory: android
+              run: |
+                gem install bundler:2.2.27
+                bundle config path vendor/bundle
+                bundle install --jobs 4 --retry 3
+
+            - name: Apply internal patch
+              working-directory: android
+              run: |
+                  cp ../patches/android/hasPremium.patch .
+                  git apply hasPremium.patch -v
+
+            - name: Generate release Play Store APK
+              working-directory: android
+              env:
+                KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+                KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                echo ${{ secrets.SIGN_KEYSTORE_BASE64 }} | base64 -d > ./keystores/leamocc.jks
+                mkdir ./app/src/standardRelease
+                echo ${{ secrets.GOOGLE_SERVICES_JSON }} | base64 -d > ./app/src/standardRelease/google-services.json
+                bundle exec fastlane assemblePlayStoreReleaseApk \
+                storeFile:leamocc.jks \
+                storePassword:"${{ env.KEYSTORE_PASSWORD }}" \
+                keyAlias:key0 \
+                keyPassword:"${{ env.KEY_PASSWORD }}"
+
+            - name: Create release
+              uses: ncipollo/release-action@2c591bcc8ecdcd2db72b97d6147f871fcd833ba5 # v1.14.0
+              continue-on-error: true
+              with:
+                  artifacts: "android/app/build/outputs/apk/standard/release/*.apk"
+                  tag: "${{ env._LATEST_ANDROID_TAG }}"
+                  name: "${{ env._LATEST_ANDROID_TAG }}"
+                  body: "${{ env._LATEST_ANDROID_TAG }} [Original Changelog](https://github.com/bitwarden/android/releases/tag/${{ env._LATEST_ANDROID_TAG }})"
+                  token: ${{ secrets.GITHUB_TOKEN }}
+                  draft: false
+                  allowUpdates: false
+                  makeLatest: true
