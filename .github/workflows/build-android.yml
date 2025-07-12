@@ -66,14 +66,13 @@ jobs:
             - name: Clone real repo
               run: |
                   git clone https://github.com/bitwarden/android.git
-
-            # 
-            # - name: Setup repo
-            #   working-directory: android
-            #   run: |
-            #       git fetch --tags
-            #       echo "Checking out ${{ env._LATEST_ANDROID_TAG }}"
-            #       git checkout ${{ env._LATEST_ANDROID_TAG }}
+            
+            - name: Setup repo
+              working-directory: android
+              run: |
+                  git fetch --tags
+                  echo "Checking out ${{ env._LATEST_ANDROID_TAG }}"
+                  git checkout ${{ env._LATEST_ANDROID_TAG }}
             
             - name: Validate Gradle wrapper
               uses: gradle/actions/wrapper-validation@06832c7b30a0129d7fb559bcc6e43d26f6374244 # v4.3.1
