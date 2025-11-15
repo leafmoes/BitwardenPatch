@@ -8,6 +8,8 @@ on:
         inputs: {}
     push:
         branches: [master, main]
+        paths-ignore:
+          - ".github/workflows/build-android.yml"
     schedule:
         # On every Sunday 12:00
         - cron: "0 12 * * 0"
