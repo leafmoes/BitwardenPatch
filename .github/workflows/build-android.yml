@@ -117,6 +117,22 @@ jobs:
                 bundle config path vendor/bundle
                 bundle install --jobs 4 --retry 3
 
+            - name: Set Version From Tag
+              working-directory: android
+              run: |
+                TAG_NAME="${{ env._LATEST_ANDROID_TAG }}"
+                
+                VERSION_NAME="${TAG_NAME#v}"
+                VERSION_NAME="${VERSION_NAME%-bwpm}"
+                
+                VERSION_CODE=$((11000 + GITHUB_RUN_NUMBER))
+                
+                echo "Setting Version: $VERSION_NAME ($VERSION_CODE)"
+                
+                bundle exec fastlane setBuildVersionInfo \
+                  versionCode:$VERSION_CODE \
+                  versionName:$VERSION_NAME
+
             - name: Apply internal patch
               working-directory: android
               run: |
